@@ -20,15 +20,14 @@ const (
 	usage = "kubernetes-ldap <options>"
 )
 
-var flLdapAllowInsecure = flag.Bool("ldap-insecure", false, "Disable LDAP TLS")
 var flLdapHost = flag.String("ldap-host", "", "Host or IP of the LDAP server")
 var flLdapPort = flag.Uint("ldap-port", 389, "LDAP server port")
 var flBaseDN = flag.String("ldap-base-dn", "", "LDAP user base DN in the form 'dc=example,dc=com'")
 var flUserLoginAttribute = flag.String("ldap-user-attribute", "uid", "LDAP Username attribute for login")
 var flSearchUserDN = flag.String("ldap-search-user-dn", "", "Search user DN for this app to find users (e.g.: cn=admin,dc=example,dc=com).")
+var flLdapConnectionType = flag.String("ldap-connection-type", "tls", "Type of connection encryption to use to connect to ldap server: tls, starttls, insecure")
 var flSearchUserPassword = flag.String("ldap-search-user-password", "", "Search user password")
 var flSkipLdapTLSVerification = flag.Bool("ldap-skip-tls-verification", false, "Skip LDAP server TLS verification")
-var flUseStartTLS = flag.Bool("use-start-tls", false, "Use STARTTLS configuration to connect to ldap server")
 var flServerPort = flag.Uint("port", 4000, "Local port this proxy server will run on")
 var flTLSCertFile = flag.String("tls-cert-file", "",
 	"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert).")
@@ -74,12 +73,19 @@ func main() {
 		InsecureSkipVerify: *flSkipLdapTLSVerification,
 	}
 
+	ldapConnectionTypes := map[string]ldap.Connection{
+		"insecure": ldap.InsecureConnection{},
+		"tls":      ldap.TLSConnection{},
+		"starttls": ldap.STARTTLSConnection{},
+	}
+
+	ldapConnection := ldapConnectionTypes[*flLdapConnectionType]
+
 	ldapClient := &ldap.Client{
 		BaseDN:             *flBaseDN,
+		Connection:         &ldapConnection,
 		LdapServer:         *flLdapHost,
 		LdapPort:           *flLdapPort,
-		AllowInsecure:      *flLdapAllowInsecure,
-		UseStartTLS:        *flUseStartTLS,
 		UserLoginAttribute: *flUserLoginAttribute,
 		SearchUserDN:       *flSearchUserDN,
 		SearchUserPassword: *flSearchUserPassword,

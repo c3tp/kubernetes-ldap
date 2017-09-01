@@ -2,7 +2,6 @@ package ldap
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 
 	"github.com/go-ldap/ldap"
@@ -19,9 +18,8 @@ type Client struct {
 	BaseDN             string
 	LdapServer         string
 	LdapPort           uint
-	AllowInsecure      bool
 	UserLoginAttribute string
-	UseStartTLS        bool
+	Connection         *Connection
 	SearchUserDN       string
 	SearchUserPassword string
 	TLSConfig          *tls.Config
@@ -75,33 +73,14 @@ func (c *Client) Authenticate(username, password string) (*ldap.Entry, error) {
 	return res.Entries[0], nil
 }
 
+func (c *Client) getAddress() string {
+	return fmt.Sprintf("%s:%d", c.LdapServer, c.LdapPort)
+}
+
 // Create a new TCP connection to the LDAP server
 func (c *Client) dial() (*ldap.Conn, error) {
-	address := fmt.Sprintf("%s:%d", c.LdapServer, c.LdapPort)
-
-	var conn *ldap.Conn
-	var err error
-
-	if c.TLSConfig != nil && !c.AllowInsecure {
-		conn, err = ldap.DialTLS("tcp", address, c.TLSConfig)
-		if err != nil {
-			return conn, err
-		}
-	}
-
-	// This will send passwords in clear text (LDAP doesn't obfuscate password in any way),
-	// thus we use a flag to enable this mode
-	if c.AllowInsecure {
-		conn, err = ldap.Dial("tcp", address)
-		if err == nil && c.TLSConfig != nil && c.UseStartTLS {
-			err = conn.StartTLS(c.TLSConfig)
-		}
-
-		return conn, err
-	}
-
-	// TLSConfig was not specified, and insecure flag not set
-	return nil, errors.New("The LDAP TLS Configuration was not set.")
+	connection := c.Connection
+	return (*connection).getConnection(c.getAddress(), c.TLSConfig)
 }
 
 func (c *Client) newUserSearchRequest(username string) *ldap.SearchRequest {
