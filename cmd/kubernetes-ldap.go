@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/golang/glog"
 	"github.com/apprenda-kismatic/kubernetes-ldap/auth"
 	"github.com/apprenda-kismatic/kubernetes-ldap/ldap"
 	"github.com/apprenda-kismatic/kubernetes-ldap/token"
+	"github.com/golang/glog"
 
 	goflag "flag"
 
@@ -28,7 +28,7 @@ var flUserLoginAttribute = flag.String("ldap-user-attribute", "uid", "LDAP Usern
 var flSearchUserDN = flag.String("ldap-search-user-dn", "", "Search user DN for this app to find users (e.g.: cn=admin,dc=example,dc=com).")
 var flSearchUserPassword = flag.String("ldap-search-user-password", "", "Search user password")
 var flSkipLdapTLSVerification = flag.Bool("ldap-skip-tls-verification", false, "Skip LDAP server TLS verification")
-
+var flUseStartTLS = flag.Bool("use-start-tls", false, "Use STARTTLS configuration to connect to ldap server")
 var flServerPort = flag.Uint("port", 4000, "Local port this proxy server will run on")
 var flTLSCertFile = flag.String("tls-cert-file", "",
 	"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert).")
@@ -79,6 +79,7 @@ func main() {
 		LdapServer:         *flLdapHost,
 		LdapPort:           *flLdapPort,
 		AllowInsecure:      *flLdapAllowInsecure,
+		UseStartTLS:        *flUseStartTLS,
 		UserLoginAttribute: *flUserLoginAttribute,
 		SearchUserDN:       *flSearchUserDN,
 		SearchUserPassword: *flSearchUserPassword,

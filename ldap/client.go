@@ -21,6 +21,7 @@ type Client struct {
 	LdapPort           uint
 	AllowInsecure      bool
 	UserLoginAttribute string
+	UseStartTLS        bool
 	SearchUserDN       string
 	SearchUserPassword string
 	TLSConfig          *tls.Config
@@ -78,14 +79,25 @@ func (c *Client) Authenticate(username, password string) (*ldap.Entry, error) {
 func (c *Client) dial() (*ldap.Conn, error) {
 	address := fmt.Sprintf("%s:%d", c.LdapServer, c.LdapPort)
 
-	if c.TLSConfig != nil {
-		return ldap.DialTLS("tcp", address, c.TLSConfig)
+	var conn *ldap.Conn
+	var err error
+
+	if c.TLSConfig != nil && !c.AllowInsecure {
+		conn, err = ldap.DialTLS("tcp", address, c.TLSConfig)
+		if err != nil {
+			return conn, err
+		}
 	}
 
 	// This will send passwords in clear text (LDAP doesn't obfuscate password in any way),
 	// thus we use a flag to enable this mode
-	if c.TLSConfig == nil && c.AllowInsecure {
-		return ldap.Dial("tcp", address)
+	if c.AllowInsecure {
+		conn, err = ldap.Dial("tcp", address)
+		if err == nil && c.TLSConfig != nil && c.UseStartTLS {
+			err = conn.StartTLS(c.TLSConfig)
+		}
+
+		return conn, err
 	}
 
 	// TLSConfig was not specified, and insecure flag not set
