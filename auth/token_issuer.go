@@ -50,7 +50,8 @@ func (lti *LDAPTokenIssuer) ServeHTTP(resp http.ResponseWriter, req *http.Reques
 
 func (lti *LDAPTokenIssuer) createToken(ldapEntry *goldap.Entry) *token.AuthToken {
 	return &token.AuthToken{
-		Username: ldapEntry.DN,
+		Username: ldapEntry.GetAttributeValue("uid"),
+		Groups:   ldapEntry.GetAttributeValues("o"),
 		Assertions: map[string]string{
 			"ldapServer": lti.LDAPServer,
 			"userDN":     ldapEntry.DN,
