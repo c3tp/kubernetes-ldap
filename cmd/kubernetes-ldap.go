@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/apprenda-kismatic/kubernetes-ldap/auth"
+	"github.com/apprenda-kismatic/kubernetes-ldap/authz"
 	"github.com/apprenda-kismatic/kubernetes-ldap/ldap"
 	"github.com/apprenda-kismatic/kubernetes-ldap/token"
 	"github.com/golang/glog"
@@ -100,6 +101,13 @@ func main() {
 		LDAPAuthenticator: ldapClient,
 		TokenSigner:       tokenSigner,
 	}
+
+	accountAuthorizer := &authz.Authorizer{
+		LDAPAuthenticator: ldapClient,
+	}
+
+	// Endpoint for authorizing user data.
+	http.Handle("/authorize", accountAuthorizer)
 
 	// Endpoint for authenticating with token
 	http.Handle("/authenticate", webhook)
