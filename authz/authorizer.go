@@ -1,84 +1,63 @@
 package authz
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/apprenda-kismatic/kubernetes-ldap/ldap"
-	"github.com/golang/glog"
+	goldap "github.com/go-ldap/ldap"
 )
 
 // Authorizer with authorization endpoint for ldap requests.
 type Authorizer struct {
-	LDAPAuthenticator *ldap.Client
+	LDAPAuthenticator ldap.Authenticator
 }
 
-func (auth *Authorizer) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		resp.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	jsonRequest, err := unmarshallJSONRequest(req)
-	if err != nil {
-		resp.WriteHeader(http.StatusBadRequest)
-		glog.Errorf("Error unmarshalling request: %v", err)
-		return
-	}
-	defer req.Body.Close()
-
-	if isAuthorized(jsonRequest) {
-		writeAuthorizedResponse(resp)
-		return
-	}
-	writeUnauthorizedResponse(resp)
-	return
+func (auth *Authorizer) isAuthorized(request *ReviewRequest) bool {
+	return auth.partialFakeAuthz(request)
 }
 
-func unmarshallJSONRequest(req *http.Request) (*ReviewRequest, error) {
-	reviewRequest := &ReviewRequest{}
-	err := json.NewDecoder(req.Body).Decode(reviewRequest)
-	if err != nil {
-		return reviewRequest, err
-	}
-
-	return nil, nil
-}
-
-func isAuthorized(interface{}) bool {
+func (auth *Authorizer) fakeAuthz(request *ReviewRequest) bool {
 	return true
 }
 
-func writeAuthorizedResponse(resp http.ResponseWriter) {
-	// request is authorized
-	status := ReviewStatus{
-		Allowed: true,
-	}
-	writeCannedResponse(status, resp)
-}
-
-func writeUnauthorizedResponse(resp http.ResponseWriter) {
-	status := ReviewStatus{
-		Allowed: false,
-		Reason:  "default denied authorization response",
-	}
-	writeCannedResponse(status, resp)
-}
-
-func writeCannedResponse(status ReviewStatus, resp http.ResponseWriter) {
-	reviewResponse := ReviewResponse{
-		APIVersion: "authorization.k8s.io/v1beta1",
-		Kind:       "SubjectAccessReview",
-		Status:     status,
+func (auth *Authorizer) partialFakeAuthz(request *ReviewRequest) bool {
+	if validQueryForFedEngine(request) {
+		return true
 	}
 
-	respJSON, err := json.Marshal(reviewResponse)
+	entry, err := auth.LDAPAuthenticator.GetUserInfo(request.Status.User)
 	if err != nil {
-		glog.Errorf("Error marshalling response: %v", err)
-		resp.WriteHeader(http.StatusInternalServerError)
-		return
+		return false
 	}
 
-	resp.Header().Add("Content-Type", "application/json")
-	resp.Write(respJSON)
+	return validQuery(entry, request)
+}
+
+func validQuery(entry *goldap.Entry, request *ReviewRequest) bool {
+	return validQueryForCANFARStaff(entry, request) ||
+		validQueryForCCStaff(entry, request)
+}
+
+func validQueryForFedEngine(request *ReviewRequest) bool {
+	return request.Status.User == "federation-controller-manager" ||
+		request.Status.User == "admin"
+}
+
+func validQueryForCANFARStaff(entry *goldap.Entry, request *ReviewRequest) bool {
+	if request.Status.ResourceAttributes.Namespace != "canfar" {
+		return false
+	}
+	for _, val := range request.Status.Group {
+		if val == "NRC Herzberg Institute of Astrophysics" {
+			return true
+		}
+	}
+	return false
+}
+
+func validQueryForCCStaff(entry *goldap.Entry, request *ReviewRequest) bool {
+	for _, val := range request.Status.Group {
+		if val == "CC: Compute Canada" {
+			return true
+		}
+	}
+	return false
 }
