@@ -31,7 +31,7 @@ func (endpoint *Endpoint) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 		writeAuthorizedResponse(resp)
 		return
 	}
-	glog.Errorf("the user %s is unauthorized", jsonRequest.Status.User)
+	glog.Errorf("the user %s is unauthorized: part of groups: %v", jsonRequest.Status.User, jsonRequest.Status.Group)
 	writeUnauthorizedResponse(resp)
 	return
 }

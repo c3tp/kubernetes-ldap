@@ -1,6 +1,8 @@
 package authz
 
 import (
+	"strings"
+
 	"github.com/apprenda-kismatic/kubernetes-ldap/ldap"
 	goldap "github.com/go-ldap/ldap"
 )
@@ -19,7 +21,7 @@ func (auth *Authorizer) fakeAuthz(request *ReviewRequest) bool {
 }
 
 func (auth *Authorizer) partialFakeAuthz(request *ReviewRequest) bool {
-	if validQueryForFedEngine(request) {
+	if validQueryForFedEngine(request) || validQueryForSystem(request) {
 		return true
 	}
 
@@ -34,6 +36,16 @@ func (auth *Authorizer) partialFakeAuthz(request *ReviewRequest) bool {
 func validQuery(entry *goldap.Entry, request *ReviewRequest) bool {
 	return validQueryForCANFARStaff(entry, request) ||
 		validQueryForCCStaff(entry, request)
+}
+
+func validQueryForSystem(request *ReviewRequest) bool {
+	for _, val := range request.Status.Group {
+		if strings.HasPrefix(val, "system:") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func validQueryForFedEngine(request *ReviewRequest) bool {
