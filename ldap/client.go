@@ -10,6 +10,7 @@ import (
 // Authenticator authenticates a user against an LDAP directory
 type Authenticator interface {
 	Authenticate(username, password string) (*ldap.Entry, error)
+	GetUserInfo(username string) (*ldap.Entry, error)
 }
 
 // Client represents a connection, and associated lookup strategy,
@@ -30,7 +31,7 @@ type Client struct {
 func (c *Client) Authenticate(username, password string) (*ldap.Entry, error) {
 	conn, err := c.dial()
 	if err != nil {
-		return nil, fmt.Errorf("Error opening LDAP connection: %v", err)
+		return nil, fmt.Errorf("Authentication: Error opening LDAP connection: %v", err)
 	}
 	defer conn.Close()
 
@@ -44,6 +45,36 @@ func (c *Client) Authenticate(username, password string) (*ldap.Entry, error) {
 		return nil, fmt.Errorf("Error binding user to LDAP server: %v", err)
 	}
 
+	entry, err := c.getEntry(conn, username)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now that we know the user exists within the BaseDN scope
+	// let's do user bind to check credentials using the full DN instead of
+	// the attribute used for search
+	if c.SearchUserDN != "" && c.SearchUserPassword != "" {
+		err = conn.Bind(entry.DN, password)
+		if err != nil {
+			return nil, fmt.Errorf("Error binding user %s, invalid credentials: %v", username, err)
+		}
+	}
+
+	return entry, nil
+}
+
+// GetUserInfo queries the ldap server and tries to find a user with userinfo.
+func (c *Client) GetUserInfo(username string) (*ldap.Entry, error) {
+	conn, err := c.dial()
+	if err != nil {
+		return nil, fmt.Errorf("Authentication: Error opening LDAP connection: %v", err)
+	}
+	defer conn.Close()
+
+	return c.getEntry(conn, username)
+}
+
+func (c *Client) getEntry(conn *ldap.Conn, username string) (*ldap.Entry, error) {
 	req := c.newUserSearchRequest(username)
 
 	// Do a search to ensure the user exists within the BaseDN scope
@@ -59,17 +90,6 @@ func (c *Client) Authenticate(username, password string) (*ldap.Entry, error) {
 		return nil, fmt.Errorf("Multiple entries found for the search filter '%s': %+v", req.Filter, res.Entries)
 	}
 
-	// Now that we know the user exists within the BaseDN scope
-	// let's do user bind to check credentials using the full DN instead of
-	// the attribute used for search
-	if c.SearchUserDN != "" && c.SearchUserPassword != "" {
-		err = conn.Bind(res.Entries[0].DN, password)
-		if err != nil {
-			return nil, fmt.Errorf("Error binding user %s, invalid credentials: %v", username, err)
-		}
-	}
-
-	// Single user entry found
 	return res.Entries[0], nil
 }
 

@@ -102,12 +102,14 @@ func main() {
 		TokenSigner:       tokenSigner,
 	}
 
-	accountAuthorizer := &authz.Authorizer{
-		LDAPAuthenticator: ldapClient,
+	authorizeEndpoint := &authz.Endpoint{
+		Authorizer: &authz.Authorizer{
+			LDAPAuthenticator: ldapClient,
+		},
 	}
 
 	// Endpoint for authorizing user data.
-	http.Handle("/authorize", accountAuthorizer)
+	http.Handle("/authorize", authorizeEndpoint)
 
 	// Endpoint for authenticating with token
 	http.Handle("/authenticate", webhook)
