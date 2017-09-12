@@ -22,9 +22,10 @@ type ReviewRequest struct {
 
 // RequestSpec is the information to verify whether a user is allowed to access
 type RequestSpec struct {
-	ResourceAttributes ResourceAttributes
-	User               string   `json:"user"`
-	Group              []string `json:"group"`
+	NonResourceAttributes NonResourceAttributes `json:"nonResourceAttributes,omitempty"`
+	ResourceAttributes    ResourceAttributes    `json:"resourceAttributes,omitempty"`
+	User                  string                `json:"user"`
+	Group                 []string              `json:"group"`
 }
 
 // ResourceAttributes is the k8s request type.
@@ -33,4 +34,10 @@ type ResourceAttributes struct {
 	Verb      string `json:"verb"`
 	Group     string `json:"group"`
 	Resource  string `json:"resource"`
+}
+
+// ResourceAttributes is the k8s request type.
+type NonResourceAttributes struct {
+	Path string `json:"path"`
+	Verb string `json:"verb"`
 }

@@ -54,15 +54,17 @@ func validQueryForFedEngine(request *ReviewRequest) bool {
 }
 
 func validQueryForCANFARStaff(entry *goldap.Entry, request *ReviewRequest) bool {
-	if request.Status.ResourceAttributes.Namespace != "canfar" {
-		return false
-	}
 	for _, val := range request.Status.Group {
 		if val == "NRC Herzberg Institute of Astrophysics" {
-			return true
+			break
 		}
 	}
-	return false
+
+	if request.Status.ResourceAttributes != (ResourceAttributes{}) {
+		return request.Status.ResourceAttributes.Namespace == "canfar"
+	}
+	return true
+
 }
 
 func validQueryForCCStaff(entry *goldap.Entry, request *ReviewRequest) bool {
